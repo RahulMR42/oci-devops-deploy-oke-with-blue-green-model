@@ -47,7 +47,7 @@ outputArtifacts:
     type: DOCKER_IMAGE
     # this location tag doesn't effect the tag used to deliver the container image
     # to the Container Registry
-    location: golan_appoke_app_base_base:latest
+    location: oke_app_base:latest
 
   - name: oke_deploy_manifest
     type: BINARY
