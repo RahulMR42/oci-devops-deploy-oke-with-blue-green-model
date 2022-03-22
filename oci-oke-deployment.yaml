@@ -18,7 +18,7 @@ spec:
           image: us-ashburn-1.ocir.io/fahdabidiroottenancy/rahul/mr-devops/mr-devops-oke-bg-sample:${BUILDRUN_HASH}
           imagePullPolicy: Always
           ports:
-            - containerPort: 8080
+            - containerPort: 80
               protocol: TCP
           livenessProbe:
             exec:
@@ -36,9 +36,9 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-    - port: 80
+    - port: 8080
       protocol: TCP
-      targetPort: 8080
+      targetPort: 80
   selector:
     app: sample-oke-bg-app
 ---
