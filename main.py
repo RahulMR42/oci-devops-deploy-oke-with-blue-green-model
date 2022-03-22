@@ -9,5 +9,5 @@ app = FastAPI()
 
 @app.get("/")
 def read_root():
-    version = os.getenv('namespace', default = 'ns-red')
+    namespace = os.getenv('namespace', default = 'ns-red')
     return {"Message": "with Love from OCI Devops ","deployed_namespace":namespace}
