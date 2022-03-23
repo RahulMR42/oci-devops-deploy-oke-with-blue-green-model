@@ -27,7 +27,7 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 5
           env:
-            - name: pod-namespace
+            - name: POD_NAMESPACE
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
