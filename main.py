@@ -11,4 +11,4 @@ app = FastAPI()
 def read_root():
     version="1.1"
     namespace = os.getenv('POD_NAMESPACE', default = 'ns-red')
-    return {"Message": "with Love from OCI Devops ","Version":version,"Served via":namespace}
+    return {"Message": "with Love from OCI Devops ","Version":version,"Namespace":namespace}
