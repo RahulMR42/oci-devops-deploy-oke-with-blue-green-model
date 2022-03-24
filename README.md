@@ -114,86 +114,252 @@ outputArtifacts:
 
 ![](images/oci-devops-deployment.png)
 
-- Add a stage as `Apply manifest to your Kubernetes cluster`.
+- Add a stage as `Blue/Green Strategy`.
 
-![](images/oci-deploy-oke-stage.png)
+![](images/oci-deploy-stage-bg-1.png)
+
+- Select the `Deployment type` as `OKE` and select the `environment` created.
 
 - Associate the the `oke environment` created.
 
-![](images/oci-deploy-oke-stage-2.png)
-
-- Create a `deployment parameter` as `namespace` and give a namespace value.
-
-![](images/oci-deploy-param.png)
-
-- Add a new stage `invoke deployment` to the `build pipeline`. - https://docs.oracle.com/en-us/iaas/Content/devops/using/triggerdeploy_stage.htm
+![](images/oci-deploy-stage-bg-2.png)
 
 
-![](images/oci-deploy-trigger-deployment.png)
+- Select Namespace A as `ns-green` and Namespace B as `ns-blue`.(These are names for test ,you may use other names accordingly)
+
+![](images/oci-deploy-stage-bg-3.png)
+
+- Select the `Kubernetes Artifacts`.
+
+![](images/oci-deploy-stage-bg-4.png)
+
+- Fill the ingress name as `sample-oke-bg-app-ing` .Its the sample ingress name declared via [deployment manifest.](oci-oke-deployment.yaml)
+
+![](images/oci-deploy-stage-bg-5.png)
+
+- As its a demo keep the `Validation controls` as `None`or you may connect with a function to validate the deployment.
+
+![](images/oci-deploy-bg-validation.png)
+
+- Enable the `Approval controls` and add `1` as the number of approvers.
+
+![](images/oci-deploy-approval.png)
+
+- Click add to add the stages.
+
+![](images/oci-deploy-all-stages.png)
 
 
-- Associate the deployment pipeline. 
+ - Switch back to `Build pipeline` and add a `Trigger Deployment` stage.Select the deployment pipeline and associate.Ensure to `check` the Send build pipelines Parameters option.
+
+ ![](images/oci-build-trigger-deploy.png)
 
 
-![](images/oci-deploy-invoke-build.png)
+- In order to run the blue green we should install `Nginx Ingress Controller` to our `OKE` cluster.
+- Launch `OCI Cloud shell` to enable the OKE access.
+- Follow the instruction via `Access Cluster` tab for the OKE cluster.
 
+![](images/oci-oke.png)
 
-![](images/oci-devops-buildpipeline-all-stages.png)
+- Validate the kubernetes access using `kubectl get nodes` & `kubectl config view`.
 
+![](images/kubectl-get-nodes.png)
 
-Test the pipeline & Application
------
+- We will be following the procedure to install and setup `Ingress Controller` - https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengsettingupingresscontroller.htm 
 
-
-- Let test now . Use a `manual run` and invoke the build pipeline.
-
-![](images/oci-devops-build-manual-run.png)
-
-- Wait for all the stages to complete 
-
-![](images/oci-build-stage-status.png)
-
-- After the `Trigger deployment` stage ,switch to `deployment pipeline` and follow the completion of stage.
-
-![](images/oci-deployment-stage-status.png)
-
-- Once it done switch to `cloud shell` or a `terminal` where you have access to the `OKE`.
-
-- Use `OKE Access Cluster` option via console to set the `kubernetes context`.
-
-![](images/oci-oke-access-cluster.png)
-
-- Use `kubectl` commands and validate the application.
-
-```
-kubectl get ns <namespace>
-```
-
-![](images/kubectl-get-ns.png)
-
-- Fetch the application loadbalancer EXTERNAL-IP to access the app.
+- Create a `clusterrolebinding` with user `ocid`.
 
 ```
-kubectl get all -n <namespace>
+kubectl create clusterrolebinding oke_cluster_role_<username> --clusterrole=cluster-admin --user=ocid1.user.oc1..xxx
+```
+
+
+- Install the Ingress controller,always use the latest version. - https://github.com/kubernetes/ingress-nginx#changelog 
+
+```
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.1.2/deploy/static/provider/cloud/deploy.yaml
+```
+
+- Create and save the file cloud-generic.yaml containing the following code to define the ingress-nginx ingress controller service as a load balancer service.
+
+```
+kind: Service
+apiVersion: v1
+metadata:
+  name: ingress-nginx
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+    - name: https
+      port: 443
+      targetPort: https
 
 ```
 
-![](images/kubect-get-all.png)
-
-- Launch the application via the browser or via curl.
-
+- Using the file you just saved, create the ingress-nginx ingress controller service by running the following command.
 
 ```
-curl http://EXTERNAL-IP
+kubectl apply -f cloud-generic.yaml
 ```
 
-![](images/app-curl-view.png)
+- You may follow the procedure to create a TLS certificate for nginx.
+
+```
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout tls.key -out tls.crt -subj "/CN=nginxsvc/O=nginxsvc"
+kubectl create secret tls tls-secret --key tls.key --cert tls.crt
+```
+
+- You may skip the sample application example in the procedure.
+
+- Validate the installation.
+
+```
+kubectl get svc -n ingress-nginx
+```
+- The EXTERNAL-IP for the ingress-nginx ingress controller service is shown as `pending` until the load balancer has been fully created in Oracle Cloud Infrastructure.Repeat the kubectl get svc command until an EXTERNAL-IP is shown for the ingress-nginx ingress controller service.
 
 
+![](images/kubectl-get-svc.png)
 
-![](images/app-browser-view.png)
+- Create two new namespaces for the deployment.
+
+```
+kubectl create ns ns-blue;kubectl create ns  ns-green
+```
+
+- Go back to build pipeline and do click `Start manual run`.
+
+![](images/oci-build-run-1.png)
+
+- Wait untill all the  `build stages` completed.
+
+![](images/oci-build-run-2.png)
+
+- Switch to the `deployment pipeline` and click on the deployment which is in `progress`.
+
+![](images/oci-deploy-bg-1.png)
+
+- The pipeline will be pending for `Approval` stage.
+- Validate the first deployment at this stage.You should see a valid deployments at namespace `ns-green`.
+
+```
+for i in ns-green ns-blue ; do echo "-- NS:$i --";kubectl get po,ing -n $i; done
+
+```
+
+![](images/oci-deploy-bg-validate-1.png)
+
+- Click on the `3 dots` and validate the `Control:Approval` stage.
+
+![](images/oci-deploy-bg-approval-1.png)
+![](images/oci-deploy-bg-approval-2.png)
+
+- Wait for all the steps to complete.
+
+![](images/oci-deploy-bg-all-stages.png)
+
+- Validate the deployment using the `Ingress Address`.
+
+```
+curl -k http://<Ingress Address>
+```
+
+- Edit the source code - `main.py` and change the version to `0.1` and run the build pipeline again to test a new deployment scenario.
+
+```
+from typing import Optional
+
+from fastapi import FastAPI
+
+import os
+
+app = FastAPI()
 
 
+@app.get("/")
+def read_root():
+    version="0.0"
+    namespace = os.getenv('POD_NAMESPACE', default = 'ns-red')
+    return {"Message": "with Love from OCI Devops ","Version":version,"Namespace":namespace}
+```
+
+- Go back to build pipeline and do click `Start manual run`.
+
+![](images/oci-build-run-1.png)
+
+- Wait untill all the  `build stages` completed.
+
+![](images/oci-build-run-2.png)
+
+- Switch to the `deployment pipeline` and click on the deployment which is in `progress`.
+
+![](images/oci-deploy-bg-1.png)
+
+- The pipeline will be pending for `Approval` stage.
+- Validate the first deployment at this stage.You should see a valid deployments at namespace `ns-blue` too.
+
+```
+for i in ns-green ns-blue ; do echo "-- NS:$i --";kubectl get po,ing -n $i; done
+
+```
+
+![](images/oci-deploy-bg-stage-2.png)
+
+- Validate the deployment using the `Ingress Address`.
+
+```
+curl -k http://<Ingress Address>
+```
+
+Output :
+
+```
+{"Message":"with Love from OCI Devops ","Version":"0.1","Namespace":"ns-blue"}
+```
+
+- You can continue other re-run from build pipeline and validate the switch between environment.
+
+- Let us now try a `Manul roleback`.
+
+- Use the `3 dots` at the stage `Traffic Shift` stage and select `Manual Rollback`.
+
+![](images/oci-deploy-bg-roleback-1.png)
+
+- Select a previously sucessful deployment.
+
+![](images/oci-deploy-bg-roleback-2.png)
+
+- Close the `select deployment` page and click `Rollback Stage` option.
+
+![](images/oci-deploy-bg-roleback-3.png)
+
+- Wait for stage to complete .
+
+![](images/oci-deploy-bg-rolleback-done.png)
+
+- Validate the deployment using the `Ingress Address`.
+
+```
+curl -k http://<Ingress Address>
+```
+
+Output :
+
+```
+{"Message":"with Love from OCI Devops ","Version":"0.0","Namespace":"ns-green"}
+```
+
+Note : Re-Run of deployment pipeline with OKE Blue-Green stage is not supported for now.
 
 
 Read more 
