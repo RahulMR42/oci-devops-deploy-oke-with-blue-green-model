@@ -7,7 +7,7 @@ import os
 app = FastAPI()
 
 
-@app.get("/details")
+@app.get("/")
 def read_root():
     version="0.0.0"
     namespace = os.getenv('POD_NAMESPACE', default = 'ns-red')
