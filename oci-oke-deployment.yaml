@@ -60,7 +60,7 @@ spec:
   rules:
   - http:
       paths:
-        - path: /
+        - path: /details
           pathType: Prefix
           backend:
             service:
